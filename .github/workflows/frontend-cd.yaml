@@ -52,7 +52,7 @@ jobs:
         working-directory: starter/frontend
         run: CI=true npm test -- --watchAll=false
 
-    build:
+  build:
     name: Build Frontend Docker Image
     needs:
       - lint
