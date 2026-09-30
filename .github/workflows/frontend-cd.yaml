@@ -86,3 +86,43 @@ jobs:
         run: |
           docker push \
             ${{ steps.login-ecr.outputs.registry }}/frontend:${{ github.sha }}
+
+  deploy:
+    name: Deploy Frontend to EKS
+    needs:
+      - build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name cluster \
+            --region us-east-1
+
+      - name: Install kustomize
+        run: |
+          curl -sL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz \
+            -o kustomize.tar.gz
+          tar -xzf kustomize.tar.gz
+          sudo mv kustomize /usr/local/bin/kustomize
+
+      - name: Update frontend image
+        working-directory: starter/frontend/k8s
+        run: |
+          kustomize edit set image frontend=853846223127.dkr.ecr.us-east-1.amazonaws.com/frontend:${{ github.sha }}
+
+      - name: Deploy frontend
+        working-directory: starter/frontend/k8s
+        run: |
+          kustomize build | kubectl apply -f -
